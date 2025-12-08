@@ -35,6 +35,7 @@ async function init () {
     const description = parts.slice(2).join(" ");
     const extensions = parts[1].split(",");
 
+    // TODO: Extract specifics with `ffmpeg -hide_banner -h muxer=<format>`
     for (const extension of extensions) {
       supportedFormats.push({
         name: description + (extensions.length > 1 ? (" / " + extension) : ""),
@@ -53,13 +54,23 @@ async function init () {
   await ffmpeg.exec(["-formats", "-hide_banner"]);
   ffmpeg.off("log", handleFormatDump);
 
+  await ffmpeg.terminate();
+
 }
 
 async function doConvert (inputFile, inputFormat, outputFormat) {
 
+  await ffmpeg.load();
+
   await ffmpeg.writeFile(inputFile.name, inputFile.bytes);
   await ffmpeg.exec(["-i", inputFile.name, "-f", outputFormat.internal, "output"]);
-  return new Uint8Array((await ffmpeg.readFile("output"))?.buffer);
+  await ffmpeg.deleteFile(inputFile.name);
+
+  const bytes = new Uint8Array((await ffmpeg.readFile("output"))?.buffer);
+  await ffmpeg.deleteFile("output");
+  await ffmpeg.terminate();
+
+  return bytes;
 
 }
 
